@@ -80,17 +80,50 @@ ESPERANDO_FOTO1, ESPERANDO_FOTO2, ESPERANDO_DESCRIPCION_ALERTA = range(3)
 
 # ── /start ──────────────────────────────────────────────
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    keyboard = [
+        [InlineKeyboardButton("🔍 Hacer una pregunta", callback_data="cmd_ask")],
+        [InlineKeyboardButton("📋 Registrar defecto", callback_data="cmd_defecto")],
+        [InlineKeyboardButton("📊 Ver historial", callback_data="cmd_historial")],
+        [InlineKeyboardButton("🔧 Generar reporte 8D", callback_data="cmd_8d")],
+        [InlineKeyboardButton("🚨 Alerta de calidad (2 fotos)", callback_data="cmd_alerta")],
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text(
-        "🔧 Quality Assistant Bot\n\n"
-        "Available commands:\n"
-        "/ask — Ask a quality question\n"
-        "/defecto — Register a defect\n"
-        "/historial — View last defects\n"
-        "/8d — Generate an 8D report\n"
-        "/alerta — Generate a quality alert from 2 photos\n\n"
-        "You can also send a PDF for analysis.",
-        parse_mode="Markdown"
+        "🔧 Asistente de Calidad\n\nSelecciona una opción:",
+        parse_mode="Markdown",
+        reply_markup=reply_markup
     )
+
+async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    data = query.data
+    if data == "cmd_ask":
+        context.user_data["waiting_for_ask"] = True
+        await query.message.reply_text(
+            "✏️ Escribe tu pregunta de calidad:",
+            parse_mode="Markdown"
+        )
+    elif data == "cmd_defecto":
+        update.message = query.message
+        await defecto_start(update, context)
+    elif data == "cmd_historial":
+        update.message = query.message
+        await historial(update, context)
+    elif data == "cmd_8d":
+        update.message = query.message
+        await eighd_start(update, context)
+    elif data == "cmd_alerta":
+        update.message = query.message
+        await alerta_start(update, context)
+
+async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if context.user_data.get("waiting_for_ask"):
+        context.user_data["waiting_for_ask"] = False
+        await update.message.reply_text("🔍 Analizando...")
+        response = await ask_claude(update.message.text)
+        await update.message.reply_text(response)
+    
 
 # ── /ask ────────────────────────────────────────────────
 async def ask(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -104,28 +137,27 @@ async def ask(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ── /defecto ────────────────────────────────────────────
 async def defecto_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("📋 Register Defect\n\nWhat is the part name or number?", parse_mode="Markdown")
+    await update.message.reply_text("📋 Registrar Defecto\n\n¿Cuál es el nombre o número de parte?", parse_mode="Markdown")
     return PARTE
 
 async def defecto_parte(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["parte"] = update.message.text
-    await update.message.reply_text("Describe the defect:")
+    await update.message.reply_text("Describe el defecto:")
     return DESCRIPCION
 
 async def defecto_descripcion(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["descripcion"] = update.message.text
-    await update.message.reply_text("How many pieces are affected?")
+    await update.message.reply_text("¿Cuántas piezas están afectadas?")
     return CANTIDAD
 
 async def defecto_cantidad(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["cantidad"] = update.message.text
-    await update.message.reply_text("Which shift? (1 / 2 / 3)")
+    await update.message.reply_text("¿Qué turno? (1 / 2 / 3)")
     return TURNO
 
 async def defecto_turno(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["turno"] = update.message.text
     user = update.message.from_user.first_name
-
     defecto_id = registrar_defecto(
         parte=context.user_data["parte"],
         descripcion=context.user_data["descripcion"],
@@ -133,23 +165,84 @@ async def defecto_turno(update: Update, context: ContextTypes.DEFAULT_TYPE):
         turno=context.user_data["turno"],
         reportado_por=user
     )
-
     await update.message.reply_text(
-        f"✅ Defect registered\n\n"
+        f"✅ Defecto registrado\n\n"
         f"🆔 ID: {defecto_id}\n"
-        f"🔩 Part: {context.user_data['parte']}\n"
-        f"📝 Description: {context.user_data['descripcion']}\n"
-        f"🔢 Qty: {context.user_data['cantidad']}\n"
-        f"🕐 Shift: {context.user_data['turno']}\n"
-        f"👤 Reported by: {user}",
+        f"🔩 Parte: {context.user_data['parte']}\n"
+        f"📝 Descripción: {context.user_data['descripcion']}\n"
+        f"🔢 Cantidad: {context.user_data['cantidad']}\n"
+        f"🕐 Turno: {context.user_data['turno']}\n"
+        f"👤 Reportado por: {user}",
         parse_mode="Markdown"
     )
     return ConversationHandler.END
 
 async def defecto_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("❌ Registration cancelled.")
+    await update.message.reply_text("❌ Registro cancelado.")
     return ConversationHandler.END
 
+async def historial(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    defectos = obtener_defectos()
+    if not defectos:
+        await update.message.reply_text("No hay defectos registrados aún.")
+        return
+    msg = "📊 Últimos 20 defectos:\n\n"
+    for d in defectos:
+        msg += f"🆔 {d[0]} | {d[1]}\n🔩 {d[2]} — {d[3]}\n🔢 Cant: {d[4]} | Turno: {d[5]}\n👤 {d[6]}\n\n"
+    await update.message.reply_text(msg, parse_mode="Markdown")
+
+async def eighd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("📋 Generador de Reporte 8D\n\nDescribe el problema en detalle:", parse_mode="Markdown")
+    return PROBLEMA_8D
+
+async def eighd_generate(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("⚙️ Generando reporte 8D...")
+    response = await generate_8d(update.message.text)
+    await update.message.reply_text(response)
+    return ConversationHandler.END
+
+async def alerta_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    context.user_data["fotos"] = []
+    await update.message.reply_text("📸 Alerta de Calidad\n\nEnvía la primera foto (pieza buena o referencia):", parse_mode="Markdown")
+    return ESPERANDO_FOTO1
+
+async def alerta_foto1(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    photo = update.message.photo[-1]
+    file = await photo.get_file()
+    data = await file.download_as_bytearray()
+    context.user_data["foto1"] = bytes(data)
+    await update.message.reply_text("✅ Primera foto recibida.\n\nAhora envía la segunda foto (pieza defectuosa):")
+    return ESPERANDO_FOTO2
+
+async def alerta_foto2(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    photo = update.message.photo[-1]
+    file = await photo.get_file()
+    data = await file.download_as_bytearray()
+    context.user_data["foto2"] = bytes(data)
+    await update.message.reply_text("✅ Segunda foto recibida.\n\nAgrega una breve descripción (nombre de parte, operación, etc.):")
+    return ESPERANDO_DESCRIPCION_ALERTA
+
+async def alerta_generar(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("🚨 Generando alerta de calidad...")
+    response = await generate_quality_alert(
+        context.user_data["foto1"],
+        context.user_data["foto2"],
+        update.message.text
+    )
+    await update.message.reply_text(response)
+    return ConversationHandler.END
+
+async def handle_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("📄 Analizando PDF...")
+    file = await update.message.document.get_file()
+    data = await file.download_as_bytearray()
+    pdf = fitz.open(stream=bytes(data), filetype="pdf")
+    text = ""
+    for page in pdf:
+        text += page.get_text()
+    text = text[:8000]
+    response = await analyze_pdf_text(text)
+    await update.message.reply_text(response)
 # ── /historial ──────────────────────────────────────────
 async def historial(update: Update, context: ContextTypes.DEFAULT_TYPE):
     defectos = obtener_defectos()
