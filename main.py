@@ -15,19 +15,19 @@ ESPERANDO_FOTO1, ESPERANDO_FOTO2, ESPERANDO_DESCRIPCION_ALERTA = 5, 6, 7
 
 # ── /start ──────────────────────────────────────────────
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-keyboard = [
-[InlineKeyboardButton("🔍 Hacer una pregunta", callback_data="cmd_ask")],
-[InlineKeyboardButton("📋 Registrar defecto", callback_data="cmd_defecto")],
-[InlineKeyboardButton("📊 Ver historial", callback_data="cmd_historial")],
-[InlineKeyboardButton("🔧 Generar reporte 8D", callback_data="cmd_8d")],
-[InlineKeyboardButton("🚨 Alerta de calidad (2 fotos)", callback_data="cmd_alerta")],
-]
-reply_markup = InlineKeyboardMarkup(keyboard)
-await update.message.reply_text(
-"🔧 *Asistente de Calidad*\n\nSelecciona una opción:",
-parse_mode="Markdown",
-reply_markup=reply_markup
-)
+    keyboard = [
+        [InlineKeyboardButton("🔍 Hacer una pregunta", callback_data="cmd_ask")],
+        [InlineKeyboardButton("📋 Registrar defecto", callback_data="cmd_defecto")],
+        [InlineKeyboardButton("📊 Ver historial", callback_data="cmd_historial")],
+        [InlineKeyboardButton("🔧 Generar reporte 8D", callback_data="cmd_8d")],
+        [InlineKeyboardButton("🚨 Alerta de calidad (2 fotos)", callback_data="cmd_alerta")],
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await update.message.reply_text(
+        "🔧 *Asistente de Calidad*\n\nSelecciona una opción:",
+        parse_mode="Markdown",
+        reply_markup=reply_markup
+    )
 
 # ── Botones ─────────────────────────────────────────────
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
