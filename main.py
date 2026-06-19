@@ -64,7 +64,7 @@ async def generate_quality_alert(image1_data: bytes, image2_data: bytes, descrip
         }]
     )
     return message.content[0].text
-[11:28 a.m., 19/6/2026] Jesus Cavazos: import os
+import os
 import fitz
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes, ConversationHandler
@@ -225,8 +225,9 @@ def main():
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("ask", ask))
     app.add_handler(CommandHandler("historial", historial))
-     app.add_handler(ConversationHandler(
-        entry_points=[CommandHandler("defecto", defecto_start)],
+
+    app.add_handler(ConversationHandler( 
+              entry_points=[CommandHandler("defecto", defecto_start)],
         states={
             PARTE: [MessageHandler(filters.TEXT & ~filters.COMMAND, defecto_parte)],
             DESCRIPCION: [MessageHandler(filters.TEXT & ~filters.COMMAND, defecto_descripcion)],
